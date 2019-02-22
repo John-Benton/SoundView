@@ -337,6 +337,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\Archive\Software\cpplibraries\opengl\src\nanovg.c">
+      <Filter>SoundView\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Archive\Software\cpplibraries\opengl\src\glad.c">
+      <Filter>SoundView\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Main.cpp">
       <Filter>SoundView\Source</Filter>
     </ClCompile>
