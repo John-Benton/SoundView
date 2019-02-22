@@ -67,27 +67,25 @@ public:
 private:
 
 	juce::Rectangle<int> control_window_outline;
-	juce::Rectangle<int> display_window_visible_button_outline;
 
 	juce::Rectangle<int> display_window_outline;
 
-	juce::Rectangle<int> rta_outline;
-	juce::Rectangle<int> rta_left_region;
-	juce::Rectangle<int> rta_right_region;
-	juce::Rectangle<int> rta_top_region;
-	juce::Rectangle<int> rta_bottom_region;
-
-	juce::Rectangle<int> spectrogram_outline;
-	juce::Rectangle<int> spectrogram_left_region;
-	juce::Rectangle<int> spectrogram_right_region;
-	juce::Rectangle<int> spectrogram_top_region;
-	juce::Rectangle<int> spectrogram_bottom_region;
+	juce::Rectangle<int> rta_outline, frequency_label_outline, spectrogram_outline;
 
 	GLFWwindow *display_window;
 	struct NVGcontext *nvg_context;
 
 	int display_window_width, display_window_height;
 
+	std::vector<int> frequency_label_values{20,50,100,500,1000,5000,10000, 20000}; //the first and last values also control the upper/lower bounds of the display
+	
+	std::vector<int> frequency_gridlines{	20,30,40,50,60,70,80,90,100,
+											200,300,400,500,600,700,800,900,1000,
+											2000,3000,4000,5000,6000,7000,8000,9000,10000,
+											20000 };
+
+	std::vector<int> rta_amplitude_gridlines{0,-10,-20,-30,-40,-50,-60,-70,-80,-90,-100 }; //in dBFS
+											
 	void timerCallback() override
 	{
 
@@ -137,7 +135,9 @@ private:
 			JUCEApplicationBase::quit();
 		}
 
-		glClearColor(1.0, 1.0, 1.0, 1.0);
+		glClearColor(0.0, 0.0, 0.0, 1.0);
+
+		glClear(GL_COLOR_BUFFER_BIT);
 
 		glfwGetWindowSize(display_window, &display_window_width, &display_window_height);
 
@@ -157,37 +157,95 @@ private:
 
 		display_window_outline = juce::Rectangle<int>{ 0, 0, display_window_width, display_window_height };
 
-		rta_outline = display_window_outline.removeFromTop(display_window_outline.getHeight()*0.5);
-		int rta_outline_width{ rta_outline.getWidth() }, rta_outline_height{ rta_outline.getHeight() };
-		rta_left_region = rta_outline.removeFromLeft(rta_outline_width*0.05);
-		rta_right_region = rta_outline.removeFromRight(rta_outline_width*0.05);
-		rta_top_region = rta_outline.removeFromTop(rta_outline_height*0.10);
-		rta_bottom_region = rta_outline.removeFromBottom(rta_outline_height*0.10);
+		rta_outline = display_window_outline.removeFromTop(display_window_outline.getHeight()*0.48);
+
+		frequency_label_outline = display_window_outline.removeFromTop(display_window_outline.getHeight()*0.04);
 
 		spectrogram_outline = display_window_outline;
-		int spectrogram_outline_width{ spectrogram_outline.getWidth() }, spectrogram_outline_height{ spectrogram_outline.getHeight() };
-		spectrogram_left_region = spectrogram_outline.removeFromLeft(spectrogram_outline_width*0.05);
-		spectrogram_right_region = spectrogram_outline.removeFromRight(spectrogram_outline_width*0.05);
-		spectrogram_top_region = spectrogram_outline.removeFromTop(spectrogram_outline_height*0.10);
-		spectrogram_bottom_region = spectrogram_outline.removeFromBottom(spectrogram_outline_height*0.10);
 
-		//==========//
+		//////////
 
 		nvgStrokeWidth(ctx, 2);
 
-		nvgStrokeColor(ctx, nvgRGBA(255, 255, 255, 255));
+		nvgStrokeColor(ctx, nvgRGBA(255, 127, 0, 255));
 		
-		render_juce_int_rect(ctx, rta_outline);
-		render_juce_int_rect(ctx, rta_left_region);
-		render_juce_int_rect(ctx, rta_right_region);
-		render_juce_int_rect(ctx, rta_top_region);
-		render_juce_int_rect(ctx, rta_bottom_region);
+		//render_juce_int_rect(ctx, rta_outline);
+
+		//render_juce_int_rect(ctx, frequency_label_outline);
 		
-		render_juce_int_rect(ctx, spectrogram_outline);
-		render_juce_int_rect(ctx, spectrogram_left_region);
-		render_juce_int_rect(ctx, spectrogram_right_region);
-		render_juce_int_rect(ctx, spectrogram_top_region);
-		render_juce_int_rect(ctx, spectrogram_bottom_region);
+		//render_juce_int_rect(ctx, spectrogram_outline);
+
+		//////////
+
+		int font_size = frequency_label_outline.getHeight() * 0.8;
+
+		char int_string[33];
+
+		memset(int_string, 0, sizeof int_string);
+
+		itoa(frequency_label_values.front(), int_string, 10);
+
+		render_text(ctx, int_string, frequency_label_outline.getX() + 5, frequency_label_outline.getCentreY(), font_size, 1, FALSE);
+
+		memset(int_string, 0, sizeof int_string);
+
+		itoa(frequency_label_values.back(), int_string, 10);
+
+		render_text(ctx, int_string, frequency_label_outline.getTopRight().getX() - 5, frequency_label_outline.getCentreY(), font_size, 2, FALSE);
+
+		for (int x = 1; x < frequency_label_values.size() - 1; x++) {
+
+			memset(int_string, 0, sizeof int_string);
+
+			itoa(frequency_label_values[x], int_string, 10);
+
+			render_text(ctx, 
+						int_string, 
+						frequency_label_outline.getX() + frequency_label_outline.getWidth() * frequency_to_x_proportion(frequency_label_values[x]), 
+						frequency_label_outline.getCentreY(), 
+						font_size,
+						0, 
+						FALSE);
+
+		}
+
+		//////////
+
+		for (int x = 0; x < frequency_gridlines.size(); x++)
+		{
+
+			nvgStrokeWidth(ctx, 1);
+
+			nvgStrokeColor(ctx, nvgRGBA(40, 40, 40, 255));
+			
+			nvgBeginPath(ctx);
+
+			nvgMoveTo(ctx, rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(frequency_gridlines[x]), rta_outline.getY());
+
+			nvgLineTo(ctx, rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(frequency_gridlines[x]), rta_outline.getBottomLeft().getY());
+
+			nvgStroke(ctx);
+
+		}
+
+		//////////
+
+		for (int x = 0; x < rta_amplitude_gridlines.size(); x++)
+		{
+
+			nvgStrokeWidth(ctx, 1);
+
+			nvgStrokeColor(ctx, nvgRGBA(40, 40, 40, 255));
+
+			nvgBeginPath(ctx);
+
+			nvgMoveTo(ctx, rta_outline.getX(), rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(rta_amplitude_gridlines[x]));
+
+			nvgLineTo(ctx, rta_outline.getTopRight().getX(), rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(rta_amplitude_gridlines[x]));
+
+			nvgStroke(ctx);
+
+		}
 
 		//==========//
 
@@ -195,7 +253,10 @@ private:
 
 	}
 
-	void render_text(NVGcontext *ctx, const char* text, int center_x_pix, int center_y_pix, int font_size_pix) {
+	void render_text(	NVGcontext *ctx, const char* text, int pos_x_pix, int pos_y_pix, 
+						int font_size_pix, int positioning, bool show_bounding_box) {
+		
+		//Positioning values are 0 = center, 1 = middle left edge, 2 = middle right edge
 
 		int font_x, font_y;
 
@@ -211,18 +272,46 @@ private:
 
 		int font_height = font_bounds[3] - font_bounds[1];
 
-		font_x = center_x_pix - (font_width / 2);
+		if (positioning == 0) {
 
-		font_y = center_y_pix + (font_height / 2);
+			font_x = pos_x_pix - (font_width / 2);
+
+			font_y = pos_y_pix + (font_height / 2);
+
+		}
+
+		if (positioning == 1) {
+
+			font_x = pos_x_pix;
+
+			font_y = pos_y_pix + (font_height / 2);
+
+		}
+
+		if (positioning == 2) {
+
+			font_x = pos_x_pix - font_width;
+
+			font_y = pos_y_pix + (font_height / 2);
+
+		}
 
 		nvgText(ctx, font_x, font_y, text, NULL);
 
-		//nvgBeginPath(ctx);
+		if (show_bounding_box == true) {
 
-		//nvgRect(ctx, font_x, font_y - font_height, font_width, font_height);
+			nvgStrokeWidth(ctx, 1);
 
-		//nvgStroke(ctx);
+			nvgStrokeColor(ctx, nvgRGBA(255, 255, 255, 255));
 
+			nvgBeginPath(ctx);
+
+			nvgRect(ctx, font_x, font_y - font_height, font_width, font_height);
+
+			nvgStroke(ctx);
+
+		}
+		
 	}
 
 	void render_juce_int_rect(NVGcontext *ctx, juce::Rectangle<int> rect) {
@@ -232,6 +321,30 @@ private:
 		nvgRect(ctx, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
 
 		nvgStroke(ctx);
+
+	}
+
+	float frequency_to_x_proportion(int frequency)
+	{
+
+		float min_offset = log10f(frequency_label_values.front());
+		float max_offset = log10f(frequency_label_values.back());
+		float offset_range = max_offset - min_offset;
+
+		float freq_offset = log10f(frequency) - min_offset;
+
+		return freq_offset / offset_range;
+
+	}
+
+	float rta_dBFS_to_y_proportion(float dBFS)
+	{
+
+		float offset_range = rta_amplitude_gridlines.front() - rta_amplitude_gridlines.back();
+
+		float amplitude_offset = abs(dBFS) - rta_amplitude_gridlines.front();
+
+		return amplitude_offset / offset_range;
 
 	}
 
