@@ -20,10 +20,6 @@ public:
 		juce::Rectangle<int> screen = Desktop::getInstance().getDisplays().getMainDisplay().userArea; //Thank you Matthias Gehrmann
 	    setSize (screen.getWidth()*0.20, screen.getWidth()*0.5);
 
-		addAndMakeVisible(display_window_visible_button);
-		display_window_visible_button.setButtonText("SHOW DISPLAY WINDOW");
-		display_window_visible_button.setColour(display_window_visible_button.buttonColourId, Colours::transparentBlack);
-
         setAudioChannels (2, 2);
 
 		setup_GL(screen.getWidth());
@@ -66,8 +62,6 @@ public:
 		control_window_outline = getLocalBounds();
 		int control_window_height = control_window_outline.getHeight();
 
-		display_window_visible_button_outline = control_window_outline.removeFromTop(control_window_height*0.05);
-		display_window_visible_button.setBounds(display_window_visible_button_outline.reduced(3));
     }
 
 private:
@@ -75,7 +69,19 @@ private:
 	juce::Rectangle<int> control_window_outline;
 	juce::Rectangle<int> display_window_visible_button_outline;
 
-	TextButton display_window_visible_button;
+	juce::Rectangle<int> display_window_outline;
+
+	juce::Rectangle<int> rta_outline;
+	juce::Rectangle<int> rta_left_region;
+	juce::Rectangle<int> rta_right_region;
+	juce::Rectangle<int> rta_top_region;
+	juce::Rectangle<int> rta_bottom_region;
+
+	juce::Rectangle<int> spectrogram_outline;
+	juce::Rectangle<int> spectrogram_left_region;
+	juce::Rectangle<int> spectrogram_right_region;
+	juce::Rectangle<int> spectrogram_top_region;
+	juce::Rectangle<int> spectrogram_bottom_region;
 
 	GLFWwindow *display_window;
 	struct NVGcontext *nvg_context;
@@ -149,17 +155,39 @@ private:
 
 		//==========//
 
+		display_window_outline = juce::Rectangle<int>{ 0, 0, display_window_width, display_window_height };
+
+		rta_outline = display_window_outline.removeFromTop(display_window_outline.getHeight()*0.5);
+		int rta_outline_width{ rta_outline.getWidth() }, rta_outline_height{ rta_outline.getHeight() };
+		rta_left_region = rta_outline.removeFromLeft(rta_outline_width*0.05);
+		rta_right_region = rta_outline.removeFromRight(rta_outline_width*0.05);
+		rta_top_region = rta_outline.removeFromTop(rta_outline_height*0.10);
+		rta_bottom_region = rta_outline.removeFromBottom(rta_outline_height*0.10);
+
+		spectrogram_outline = display_window_outline;
+		int spectrogram_outline_width{ spectrogram_outline.getWidth() }, spectrogram_outline_height{ spectrogram_outline.getHeight() };
+		spectrogram_left_region = spectrogram_outline.removeFromLeft(spectrogram_outline_width*0.05);
+		spectrogram_right_region = spectrogram_outline.removeFromRight(spectrogram_outline_width*0.05);
+		spectrogram_top_region = spectrogram_outline.removeFromTop(spectrogram_outline_height*0.10);
+		spectrogram_bottom_region = spectrogram_outline.removeFromBottom(spectrogram_outline_height*0.10);
+
+		//==========//
+
 		nvgStrokeWidth(ctx, 2);
 
 		nvgStrokeColor(ctx, nvgRGBA(255, 255, 255, 255));
-
-		nvgBeginPath(ctx);
-
-		nvgRect(ctx, 0, 0, 100, 100);
-						
-		nvgStroke(ctx);
-
-		render_text(ctx, "TEST", 50, 50, 20);
+		
+		render_juce_int_rect(ctx, rta_outline);
+		render_juce_int_rect(ctx, rta_left_region);
+		render_juce_int_rect(ctx, rta_right_region);
+		render_juce_int_rect(ctx, rta_top_region);
+		render_juce_int_rect(ctx, rta_bottom_region);
+		
+		render_juce_int_rect(ctx, spectrogram_outline);
+		render_juce_int_rect(ctx, spectrogram_left_region);
+		render_juce_int_rect(ctx, spectrogram_right_region);
+		render_juce_int_rect(ctx, spectrogram_top_region);
+		render_juce_int_rect(ctx, spectrogram_bottom_region);
 
 		//==========//
 
@@ -194,6 +222,16 @@ private:
 		//nvgRect(ctx, font_x, font_y - font_height, font_width, font_height);
 
 		//nvgStroke(ctx);
+
+	}
+
+	void render_juce_int_rect(NVGcontext *ctx, juce::Rectangle<int> rect) {
+
+		nvgBeginPath(ctx);
+
+		nvgRect(ctx, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+
+		nvgStroke(ctx);
 
 	}
 
