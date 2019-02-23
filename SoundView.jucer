@@ -3,6 +3,7 @@
 <JUCERPROJECT id="HIMGLD" name="SoundView" projectType="guiapp" jucerVersion="5.3.2">
   <MAINGROUP id="P2sKT8" name="SoundView">
     <GROUP id="{9EDCC5A4-9B32-A1BE-89F6-38890F4B552C}" name="Source">
+      <FILE id="m33Kxu" name="fft.h" compile="0" resource="0" file="Source/fft.h"/>
       <FILE id="fvPTLa" name="nanovg.c" compile="1" resource="0" file="../../Archive/Software/cpplibraries/opengl/src/nanovg.c"/>
       <FILE id="H0jqfg" name="glad.c" compile="1" resource="0" file="../../Archive/Software/cpplibraries/opengl/src/glad.c"/>
       <FILE id="XyPNzu" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
@@ -11,12 +12,14 @@
   </MAINGROUP>
   <EXPORTFORMATS>
     <VS2017 targetFolder="Builds/VisualStudio2017" windowsTargetPlatformVersion="10.0.17134.0"
-            externalLibraries="glfw3.lib">
+            externalLibraries="glfw3.lib&#10;libfftw3-3.lib">
       <CONFIGURATIONS>
-        <CONFIGURATION isDebug="1" name="Debug" headerPath="D:\Archive\Software\cpplibraries\opengl\include&#10;D:\Archive\Software\cpplibraries\opengl\include\nanovg"
-                       libraryPath="D:\Archive\Software\cpplibraries\opengl\libs" winArchitecture="Win32"/>
-        <CONFIGURATION isDebug="0" name="Release" headerPath="D:\Archive\Software\cpplibraries\opengl\include&#10;D:\Archive\Software\cpplibraries\opengl\include\nanovg"
-                       libraryPath="D:\Archive\Software\cpplibraries\opengl\libs" winArchitecture="Win32"/>
+        <CONFIGURATION isDebug="1" name="Debug" headerPath="D:\Archive\Software\cpplibraries\opengl\include&#10;D:\Archive\Software\cpplibraries\opengl\include\nanovg&#10;D:\Archive\Software\cpplibraries\fftw-3.3.5-dll32"
+                       libraryPath="D:\Archive\Software\cpplibraries\opengl\libs&#10;D:\Archive\Software\cpplibraries\fftw-3.3.5-dll32"
+                       winArchitecture="Win32"/>
+        <CONFIGURATION isDebug="0" name="Release" headerPath="D:\Archive\Software\cpplibraries\opengl\include&#10;D:\Archive\Software\cpplibraries\opengl\include\nanovg&#10;D:\Archive\Software\cpplibraries\fftw-3.3.5-dll32"
+                       libraryPath="D:\Archive\Software\cpplibraries\opengl\libs&#10;D:\Archive\Software\cpplibraries\fftw-3.3.5-dll32"
+                       winArchitecture="Win32"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_core" path="C:/JUCE/modules"/>

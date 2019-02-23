@@ -11,6 +11,10 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 
+#include <deque>
+
+#include "fft.h"
+
 class MainComponent   : public AudioAppComponent, public Button::Listener, public Timer
 {
 public:
@@ -26,6 +30,14 @@ public:
 
 		startTimerHz(30);
 
+		addAndMakeVisible(audio_device_selector_component);
+
+		fft_sample_buffer.resize(fft_size);
+		fft_bin_freq.resize(fft_size / 2);
+		fft_bin_amp.resize(fft_size / 2);
+
+		generate_fft_bin_freq(fft_bin_freq, fft_size);
+
     } 
 
     ~MainComponent()
@@ -39,11 +51,29 @@ public:
 
     }
 
-    void getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill) override
-    {
+	void getNextAudioBlock(const AudioSourceChannelInfo& audio_device_buffer)
+	{
+	
+		const float* device_input_buffer = audio_device_buffer.buffer->getReadPointer(0);
 
-        bufferToFill.clearActiveBufferRegion();
-    }
+		for (int sample = 0; sample < audio_device_buffer.numSamples; ++sample) {
+
+			io_sample_buffer.push_front(device_input_buffer[sample]);
+
+		}
+
+		while (io_sample_buffer.size() > fft_size) {
+			io_sample_buffer.pop_back();
+		}
+
+		if (io_sample_buffer.size() && fft_sample_buffer.size() == fft_size)
+		{
+			fft0.fft_mtx.lock();
+			std::copy(io_sample_buffer.begin(), io_sample_buffer.end(), fft_sample_buffer.begin());
+			fft0.fft_mtx.unlock();
+		}
+
+	}
 
     void releaseResources() override
     {
@@ -62,11 +92,26 @@ public:
 		control_window_outline = getLocalBounds();
 		int control_window_height = control_window_outline.getHeight();
 
+		audio_device_selector_outline = control_window_outline.removeFromTop(control_window_height*0.20);
+		audio_device_selector_component.setBounds(audio_device_selector_outline);
+
     }
 
 private:
 
+	const int fft_size = 4096;
+	const int sample_rate = 44100;
+	fft fft0{ fft_size };
+	std::vector<float> fft_bin_freq;
+	std::vector<float> fft_bin_amp;
+
+	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager, 1,1,0,0,0,0,0,0 };
+
+	std::deque<double> io_sample_buffer;
+	std::vector<double> fft_sample_buffer;
+
 	juce::Rectangle<int> control_window_outline;
+	juce::Rectangle<int> audio_device_selector_outline;
 
 	juce::Rectangle<int> display_window_outline;
 
@@ -77,7 +122,7 @@ private:
 
 	int display_window_width, display_window_height;
 
-	std::vector<int> frequency_label_values{20,50,100,500,1000,5000,10000, 20000}; //the first and last values also control the upper/lower bounds of the display
+	std::vector<int> frequency_label_values{20,50,100,500,1000,5000,10000,20000}; //the first and last values also control the upper/lower bounds of the display
 	
 	std::vector<int> frequency_gridlines{	20,30,40,50,60,70,80,90,100,
 											200,300,400,500,600,700,800,900,1000,
@@ -89,6 +134,10 @@ private:
 	void timerCallback() override
 	{
 
+		fft0.run_fft_analysis(fft_sample_buffer);
+
+		get_fft_amplitudes(fft0.fftw_complex_out, fft_bin_amp);
+
 		render_display();
 
 	}
@@ -96,6 +145,29 @@ private:
 	void buttonClicked(Button* button) override 
 	{
 		
+	}
+
+	void generate_fft_bin_freq(std::vector<float> &freq_vect, int fft_size_N) {
+
+		freq_vect[0] = 0;
+
+		for (int x = 1; x < fft_size_N / 2; x++) {
+
+			freq_vect[x] = x * (sample_rate / fft_size_N);
+
+		}
+
+	}
+
+	void get_fft_amplitudes(std::vector<std::vector<double>> &fft_output_complex, std::vector<float> &amplitude_vector)
+	{
+
+		for (int x = 0; x < amplitude_vector.size(); x++) {
+
+			amplitude_vector[x] = sqrtf((pow(fft_output_complex[0][x],2)) + (pow(fft_output_complex[1][x], 2)));
+
+		}
+
 	}
 
 	void setup_GL(int screen_width) {
@@ -247,6 +319,29 @@ private:
 
 		}
 
+		//////////
+
+		nvgStrokeWidth(ctx, 1);
+
+		nvgStrokeColor(ctx, nvgRGBA(255, 127, 0, 255));
+
+		nvgBeginPath(ctx);
+
+		nvgMoveTo(	ctx, 
+					rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freq[1]),
+					rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(fft_bin_amp[1])));
+
+		for (int x = 2; x < fft_bin_amp.size(); x++)
+		{
+						
+			nvgLineTo(ctx,
+				rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freq[x]),
+				rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(fft_bin_amp[x])));
+
+		}
+
+		nvgStroke(ctx);
+
 		//==========//
 
 		nvgEndFrame(ctx);
@@ -324,7 +419,7 @@ private:
 
 	}
 
-	float frequency_to_x_proportion(int frequency)
+	float frequency_to_x_proportion(float frequency)
 	{
 
 		float min_offset = log10f(frequency_label_values.front());
@@ -345,6 +440,12 @@ private:
 		float amplitude_offset = abs(dBFS) - rta_amplitude_gridlines.front();
 
 		return amplitude_offset / offset_range;
+
+	}
+
+	float fft_amp_to_dBFS(double amp) {
+
+		return Decibels::gainToDecibels(amp, -96.0);
 
 	}
 
