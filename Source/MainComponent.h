@@ -56,22 +56,21 @@ public:
 	
 		const float* device_input_buffer = audio_device_buffer.buffer->getReadPointer(0);
 
+		fft0.fft_mtx.lock();
+
 		for (int sample = 0; sample < audio_device_buffer.numSamples; ++sample) {
 
-			io_sample_buffer.push_front(device_input_buffer[sample]);
+			fft0.input_time_samples.push_front(device_input_buffer[sample]);
 
 		}
 
-		while (io_sample_buffer.size() > fft_size) {
-			io_sample_buffer.pop_back();
+		while (fft0.input_time_samples.size() > fft_size) {
+			fft0.input_time_samples.pop_back();
 		}
 
-		if (io_sample_buffer.size() && fft_sample_buffer.size() == fft_size)
-		{
-			fft0.fft_mtx.lock();
-			std::copy(io_sample_buffer.begin(), io_sample_buffer.end(), fft_sample_buffer.begin());
-			fft0.fft_mtx.unlock();
-		}
+		fft0.fft_mtx.unlock();
+
+		audio_device_buffer.clearActiveBufferRegion();
 
 	}
 
@@ -107,7 +106,6 @@ private:
 
 	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager, 1,1,0,0,0,0,0,0 };
 
-	std::deque<double> io_sample_buffer;
 	std::vector<double> fft_sample_buffer;
 
 	juce::Rectangle<int> control_window_outline;
@@ -129,12 +127,12 @@ private:
 											2000,3000,4000,5000,6000,7000,8000,9000,10000,
 											20000 };
 
-	std::vector<int> rta_amplitude_gridlines{0,-10,-20,-30,-40,-50,-60,-70,-80,-90,-100 }; //in dBFS
+	std::vector<int> rta_amplitude_gridlines{0,-12,-24,-36,-48,-60,-72,-84,-96}; //in dBFS
 											
 	void timerCallback() override
 	{
 
-		fft0.run_fft_analysis(fft_sample_buffer);
+		fft0.run_fft_analysis();
 
 		get_fft_amplitudes(fft0.fftw_complex_out, fft_bin_amp);
 
@@ -149,11 +147,11 @@ private:
 
 	void generate_fft_bin_freq(std::vector<float> &freq_vect, int fft_size_N) {
 
-		freq_vect[0] = 0;
+		freq_vect[0] = 0.0;
 
 		for (int x = 1; x < fft_size_N / 2; x++) {
 
-			freq_vect[x] = x * (sample_rate / fft_size_N);
+			freq_vect[x] = x * (sample_rate * 1.0 / fft_size_N * 1.0);
 
 		}
 

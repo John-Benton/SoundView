@@ -9,6 +9,7 @@
 #include <vector>
 #include <deque>
 #include <mutex>
+#include <assert.h>
 
 //Complex arrays use the following format: [Re][0], [Imag][1]
 
@@ -28,7 +29,7 @@ public:
 
 	/*---------------------------------------------------*/
 
-	std::vector<double> input_time_samples;
+	std::deque<double> input_time_samples;
 
 	/*---------------------------------------------------*/
 
@@ -76,13 +77,9 @@ public:
 
 	};
 
-	void run_fft_analysis(std::vector<double> &time_samples) {
+	void run_fft_analysis() {
 
-		std::copy(time_samples.begin(), time_samples.begin() + local_fft_size, input_time_samples.begin());
-
-		window_samples(input_time_samples);
-
-		run_fftw(input_time_samples, fftw_complex_out);
+		run_fftw(fftw_complex_out);
 
 		normalize_fftw_output();
 
@@ -98,21 +95,20 @@ private:
 
 	}
 
-	void window_samples(std::vector<double> &samples) {
-
-		for (int n = 0; n < local_fft_size; n++) {
-			samples[n] = samples[n] * hann_window_weights[n];
-		}
-
-	}
-
-	void run_fftw(std::vector<double> &samples, std::vector<std::vector<double>> & destinaton_vector) {
+	void run_fftw(std::vector<std::vector<double>> & destinaton_vector) {
 
 		fft_mtx.lock();
 		
-		std::copy(samples.begin(), samples.begin() + local_fft_size, fftw_samples_dynamic);
-
+		std::copy(input_time_samples.begin(), input_time_samples.begin() + local_fft_size, fftw_samples_dynamic);
+		
 		fft_mtx.unlock();
+
+		float first_sample = fftw_samples_dynamic[0];
+		float last_sample = fftw_samples_dynamic[4095];
+
+		for (int n = 0; n < local_fft_size; n++) {
+			fftw_samples_dynamic[n] = fftw_samples_dynamic[n] * hann_window_weights[n];
+		}
 
 		fftw_execute(plan);
 
