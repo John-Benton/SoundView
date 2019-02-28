@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="HIMGLD" name="SoundView" projectType="guiapp" jucerVersion="5.3.2">
+<JUCERPROJECT id="HIMGLD" name="SoundView" projectType="guiapp" jucerVersion="5.4.3">
   <MAINGROUP id="P2sKT8" name="SoundView">
     <GROUP id="{9EDCC5A4-9B32-A1BE-89F6-38890F4B552C}" name="Source">
+      <FILE id="D5RzBq" name="moveavg.h" compile="0" resource="0" file="Source/moveavg.h"/>
       <FILE id="m33Kxu" name="fft.h" compile="0" resource="0" file="Source/fft.h"/>
       <FILE id="fvPTLa" name="nanovg.c" compile="1" resource="0" file="../../Archive/Software/cpplibraries/opengl/src/nanovg.c"/>
       <FILE id="H0jqfg" name="glad.c" compile="1" resource="0" file="../../Archive/Software/cpplibraries/opengl/src/glad.c"/>

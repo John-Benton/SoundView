@@ -14,6 +14,10 @@
 #include <deque>
 
 #include "fft.h"
+#include "moveavg.h"
+
+#include <chrono>
+#include <assert.h>
 
 class MainComponent   : public AudioAppComponent, public Button::Listener, public Timer
 {
@@ -38,6 +42,10 @@ public:
 
 		generate_fft_bin_freq(fft_bin_freq, fft_size);
 
+		fft_output_averager.set_num_averages(10);
+
+		fft_output_averager.set_num_samples(fft_bin_amp.size());
+
     } 
 
     ~MainComponent()
@@ -54,6 +62,8 @@ public:
 	void getNextAudioBlock(const AudioSourceChannelInfo& audio_device_buffer)
 	{
 	
+		auto start = std::chrono::high_resolution_clock::now(); //Thanks to Giovanni Dicanio for timing method
+
 		const float* device_input_buffer = audio_device_buffer.buffer->getReadPointer(0);
 
 		fft0.fft_mtx.lock();
@@ -71,6 +81,12 @@ public:
 		fft0.fft_mtx.unlock();
 
 		audio_device_buffer.clearActiveBufferRegion();
+
+		auto end = std::chrono::high_resolution_clock::now();
+
+		std::chrono::duration<double> elapsed = end - start;
+
+		double audio_time = elapsed.count();
 
 	}
 
@@ -98,7 +114,7 @@ public:
 
 private:
 
-	const int fft_size = 4096;
+	const int fft_size = 16384;
 	const int sample_rate = 44100;
 	fft fft0{ fft_size };
 	std::vector<float> fft_bin_freq;
@@ -107,7 +123,8 @@ private:
 	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager, 1,1,0,0,0,0,0,0 };
 
 	std::vector<double> fft_sample_buffer;
-
+	MovingAverage fft_output_averager;
+	
 	juce::Rectangle<int> control_window_outline;
 	juce::Rectangle<int> audio_device_selector_outline;
 
@@ -115,8 +132,19 @@ private:
 
 	juce::Rectangle<int> rta_outline, frequency_label_outline, spectrogram_outline;
 
+	//====================//
+
 	GLFWwindow *display_window;
 	struct NVGcontext *nvg_context;
+
+	int gl_success{ 0 };
+	char gl_infolog[512];
+
+	std::deque<float> spectrogram_texture_values;
+	int spectrogram_display_resolution = 1000;
+	int num_past_spectrogram_rows = 1000;
+	
+	//====================//
 
 	int display_window_width, display_window_height;
 
@@ -135,6 +163,10 @@ private:
 		fft0.run_fft_analysis();
 
 		get_fft_amplitudes(fft0.fftw_complex_out, fft_bin_amp);
+
+		update_averages();
+
+		update_spectrogram_texture();
 
 		render_display();
 
@@ -165,6 +197,40 @@ private:
 			amplitude_vector[x] = sqrtf((pow(fft_output_complex[0][x],2)) + (pow(fft_output_complex[1][x], 2)));
 
 		}
+
+	}
+
+	void update_averages() {
+
+		fft_output_averager.add_new_samples(fft_bin_amp);
+
+	}
+
+	void update_spectrogram_texture() {
+
+		int total_pixels = spectrogram_display_resolution * num_past_spectrogram_rows;
+
+		if (spectrogram_texture_values.size() != total_pixels) {
+
+			spectrogram_texture_values.clear();
+
+			spectrogram_texture_values.resize(spectrogram_display_resolution * num_past_spectrogram_rows);
+
+		}
+
+		for (int pixel = 0; pixel < spectrogram_display_resolution; pixel++) {
+
+			spectrogram_texture_values.push_front(0.5);
+
+		}
+
+		while (spectrogram_texture_values.size() > total_pixels) {
+
+			spectrogram_texture_values.pop_back();
+
+		}
+
+		
 
 	}
 
@@ -213,17 +279,15 @@ private:
 
 		glViewport(0, 0, display_window_width, display_window_height);
 
+		calc_layout();
+
 		nvg_render(nvg_context);
 
 		glfwSwapBuffers(display_window);
 
 	}
 
-	void nvg_render(NVGcontext *ctx)
-	{
-		nvgBeginFrame(ctx, display_window_width, display_window_height, 1.0f);
-
-		//==========//
+	void calc_layout() {
 
 		display_window_outline = juce::Rectangle<int>{ 0, 0, display_window_width, display_window_height };
 
@@ -233,7 +297,13 @@ private:
 
 		spectrogram_outline = display_window_outline;
 
-		//////////
+	}
+
+	void nvg_render(NVGcontext *ctx)
+	{
+		nvgBeginFrame(ctx, display_window_width, display_window_height, 1.0f);
+
+		//==========//
 
 		nvgStrokeWidth(ctx, 2);
 
@@ -325,16 +395,18 @@ private:
 
 		nvgBeginPath(ctx);
 
+		std::vector<float> rta_amplitudes = fft_output_averager.get_average();
+
 		nvgMoveTo(	ctx, 
 					rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freq[1]),
-					rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(fft_bin_amp[1])));
+					rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(rta_amplitudes[1])));
 
-		for (int x = 2; x < fft_bin_amp.size(); x++)
+		for (int x = 2; x < rta_amplitudes.size(); x++)
 		{
 						
 			nvgLineTo(ctx,
 				rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freq[x]),
-				rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(fft_bin_amp[x])));
+				rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(rta_amplitudes[x])));
 
 		}
 
