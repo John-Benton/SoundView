@@ -1857,6 +1857,7 @@
     <ClCompile Include="..\..\JuceLibraryCode\include_juce_gui_extra.cpp"/>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\gl_shader.h"/>
     <ClInclude Include="..\..\Source\moveavg.h"/>
     <ClInclude Include="..\..\Source\fft.h"/>
     <ClInclude Include="..\..\Source\MainComponent.h"/>

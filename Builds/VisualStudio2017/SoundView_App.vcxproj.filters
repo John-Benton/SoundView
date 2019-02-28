@@ -2232,6 +2232,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\gl_shader.h">
+      <Filter>SoundView\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\moveavg.h">
       <Filter>SoundView\Source</Filter>
     </ClInclude>

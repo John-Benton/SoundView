@@ -15,6 +15,7 @@
 
 #include "fft.h"
 #include "moveavg.h"
+#include "gl_shader.h"
 
 #include <chrono>
 #include <assert.h>
@@ -140,6 +141,12 @@ private:
 	int gl_success{ 0 };
 	char gl_infolog[512];
 
+	unsigned int gl_texture;
+
+	unsigned int VAO[2], VBO[2];
+
+	int gl_shader_program;
+
 	std::deque<float> spectrogram_texture_values;
 	int spectrogram_display_resolution = 1000;
 	int num_past_spectrogram_rows = 1000;
@@ -258,6 +265,31 @@ private:
 
 		}
 
+		Shader glShader{
+			"D://Active//SoundView//Source//vertex_shader.vert",
+			"D://Active//SoundView//Source//fragment_shader.frag"
+		};
+
+		gl_shader_program = glShader.ID;
+		
+		/*glGenTextures(1, &gl_texture);
+		glBindTexture(GL_TEXTURE_2D, gl_texture);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
+		
+		/*glShader.setInt("texture1", 0);*/
+
+		glGenVertexArrays(2, VAO);
+		glGenBuffers(2, VBO);
+		
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); //this will configure OpenGL to render in wireframe mode
+		
+		//==//
+
 		nvg_context = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
 
 		nvgCreateFont(nvg_context, "Arial", "C://Windows//Fonts//arial.ttf");
@@ -271,18 +303,51 @@ private:
 			JUCEApplicationBase::quit();
 		}
 
-		glClearColor(0.0, 0.0, 0.0, 1.0);
-
-		glClear(GL_COLOR_BUFFER_BIT);
-
 		glfwGetWindowSize(display_window, &display_window_width, &display_window_height);
 
 		glViewport(0, 0, display_window_width, display_window_height);
 
 		calc_layout();
 
-		nvg_render(nvg_context);
+		glUseProgram(gl_shader_program);
 
+		float triangle1[] = {
+			-1.0f, -1.0f, 0.0f,  // bottom left
+			-1.0f, 0.0f, 0.0f,  // top left
+			1.0f, 0.0f, 0.0f,  // top right
+		};
+
+		float triangle2[] = {
+			-1.0f, -1.0f, 0.0f,  // bottom left
+			1.0f, 0.0f, 0.0f,  // top right
+			1.0f, -1.0f, 0.0f   // bottom right
+		};
+
+		glBindVertexArray(VAO[0]);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle1), triangle1, GL_DYNAMIC_DRAW);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		glBindVertexArray(VAO[1]);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle2), triangle2, GL_DYNAMIC_DRAW);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+
+		//glTexImage2D();
+						
+		glClearColor(0.0, 0.0, 0.0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+						
+		glBindVertexArray(VAO[0]);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		glBindVertexArray(VAO[1]);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		nvg_render(nvg_context);
+		
 		glfwSwapBuffers(display_window);
 
 	}
