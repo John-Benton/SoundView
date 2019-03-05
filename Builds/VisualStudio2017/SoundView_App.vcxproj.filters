@@ -2232,6 +2232,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\spline.h">
+      <Filter>SoundView\Source</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\gl_shader.h">
       <Filter>SoundView\Source</Filter>
     </ClInclude>

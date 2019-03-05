@@ -17,6 +17,8 @@
 #include "moveavg.h"
 #include "gl_shader.h"
 
+#include "spline.h"
+
 #include <chrono>
 #include <assert.h>
 
@@ -38,14 +40,19 @@ public:
 		addAndMakeVisible(audio_device_selector_component);
 
 		fft_sample_buffer.resize(fft_size);
-		fft_bin_freq.resize(fft_size / 2);
-		fft_bin_amp.resize(fft_size / 2);
+		fft_bin_freqs.resize(fft_size / 2);
+		fft_bin_amps.resize(fft_size / 2);
 
-		generate_fft_bin_freq(fft_bin_freq, fft_size);
+		generate_fft_bin_freq(fft_bin_freqs, fft_size);
+
+		spectrogram_frequencies.resize(spectrogram_num_frequencies);
+		spectrogram_amplitudes.resize(spectrogram_num_frequencies);
+
+		generate_spectrogram_frequencies();
 
 		fft_output_averager.set_num_averages(10);
 
-		fft_output_averager.set_num_samples(fft_bin_amp.size());
+		fft_output_averager.set_num_samples(fft_bin_amps.size());
 
     } 
 
@@ -118,8 +125,10 @@ private:
 	const int fft_size = 16384;
 	const int sample_rate = 44100;
 	fft fft0{ fft_size };
-	std::vector<float> fft_bin_freq;
-	std::vector<float> fft_bin_amp;
+	std::vector<float> fft_bin_freqs;
+	std::vector<float> fft_bin_amps;
+
+	double dBFS_lower_limit = -96.0;
 
 	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager, 1,1,0,0,0,0,0,0 };
 
@@ -147,9 +156,12 @@ private:
 
 	int gl_shader_program;
 
-	std::deque<float> spectrogram_texture_values;
-	int spectrogram_display_resolution = 1000;
-	int num_past_spectrogram_rows = 1000;
+	std::deque<unsigned char> spectrogram_texture_pixel_values;
+
+	int spectrogram_num_frequencies = 1024; //must be a multiple of 4
+	int spectrogram_num_past_rows = 256;
+
+	std::vector<float> spectrogram_frequencies, spectrogram_amplitudes;
 	
 	//====================//
 
@@ -163,17 +175,17 @@ private:
 											20000 };
 
 	std::vector<int> rta_amplitude_gridlines{0,-12,-24,-36,-48,-60,-72,-84,-96}; //in dBFS
-											
+
+	tk::spline cubic_interpolator;
+			
 	void timerCallback() override
 	{
 
 		fft0.run_fft_analysis();
 
-		get_fft_amplitudes(fft0.fftw_complex_out, fft_bin_amp);
+		get_fft_amplitudes(fft0.fftw_complex_out, fft_bin_amps);
 
 		update_averages();
-
-		update_spectrogram_texture();
 
 		render_display();
 
@@ -196,6 +208,32 @@ private:
 
 	}
 
+	void generate_spectrogram_frequencies() {
+
+		//this function generates log spaced frequencies based on the limits of frequency_label_values and resolution of the spectrogram.
+		//these log spaced frequencies will be used to generate the spectrogram texture, which will align correctly with the log frequency 
+		//axis of the display
+
+		int lowest_freq = frequency_label_values.front();
+		int highest_freq = frequency_label_values.back();
+
+		float log_lowest_freq = log10(lowest_freq);
+		float log_higest_freq = log10(highest_freq);
+
+		float log_freq_range = log_higest_freq - log_lowest_freq;
+
+		int num_freq = spectrogram_num_frequencies;
+
+		for (int x = 0; x < num_freq; x++) {
+
+			float exponent = log_lowest_freq + (log_freq_range)*((x*1.0) / (num_freq - 1.0));
+
+			spectrogram_frequencies[x] = pow(10, exponent);
+
+		}
+		
+	}
+
 	void get_fft_amplitudes(std::vector<std::vector<double>> &fft_output_complex, std::vector<float> &amplitude_vector)
 	{
 
@@ -209,36 +247,58 @@ private:
 
 	void update_averages() {
 
-		fft_output_averager.add_new_samples(fft_bin_amp);
+		fft_output_averager.add_new_samples(fft_bin_amps);
 
 	}
 
 	void update_spectrogram_texture() {
 
-		int total_pixels = spectrogram_display_resolution * num_past_spectrogram_rows;
+		std::vector<double> interpolator_ref_freq, interpolator_ref_amp;
+		interpolator_ref_freq.resize(fft_bin_freqs.size());
+		interpolator_ref_amp.resize(fft_bin_amps.size());
 
-		if (spectrogram_texture_values.size() != total_pixels) {
+		std::copy(fft_bin_freqs.begin(), fft_bin_freqs.end(), interpolator_ref_freq.begin());
+		std::copy(fft_bin_amps.begin(), fft_bin_amps.end(), interpolator_ref_amp.begin());
 
-			spectrogram_texture_values.clear();
+		cubic_interpolator.set_points(interpolator_ref_freq, interpolator_ref_amp);
 
-			spectrogram_texture_values.resize(spectrogram_display_resolution * num_past_spectrogram_rows);
+		std::vector<float> interpolated_amplitudes;
+		interpolated_amplitudes.resize(spectrogram_num_frequencies);
 
-		}
+		for (int frequency = 0; frequency < spectrogram_num_frequencies; frequency++) {
 
-		for (int pixel = 0; pixel < spectrogram_display_resolution; pixel++) {
-
-			spectrogram_texture_values.push_front(0.5);
-
-		}
-
-		while (spectrogram_texture_values.size() > total_pixels) {
-
-			spectrogram_texture_values.pop_back();
+			interpolated_amplitudes[frequency] = cubic_interpolator(spectrogram_frequencies[frequency]);
 
 		}
 
+		int total_pixels = spectrogram_num_frequencies * spectrogram_num_past_rows;
+
+		if (spectrogram_texture_pixel_values.size() != total_pixels) {
+
+			spectrogram_texture_pixel_values.clear();
+
+			spectrogram_texture_pixel_values.resize(spectrogram_num_frequencies * spectrogram_num_past_rows);
+
+		}
+
+		for (int texture_pixel = 0; texture_pixel < spectrogram_num_frequencies; texture_pixel++) {
+
+			float frequency = spectrogram_frequencies[texture_pixel];
+
+			float value_dBFS = fft_amp_to_dBFS(cubic_interpolator(frequency));
+
+			int value_pixel = (((value_dBFS - (-96.0)) * 255) / 96);
+
+			spectrogram_texture_pixel_values.push_back(value_pixel);
+
+		}
+
+		while (spectrogram_texture_pixel_values.size() > total_pixels) {
+
+			spectrogram_texture_pixel_values.pop_front();
+
+		}
 		
-
 	}
 
 	void setup_GL(int screen_width) {
@@ -271,17 +331,19 @@ private:
 		};
 
 		gl_shader_program = glShader.ID;
+
+		//==========//
 		
-		/*glGenTextures(1, &gl_texture);
+		glGenTextures(1, &gl_texture);
 		glBindTexture(GL_TEXTURE_2D, gl_texture);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
-		
-		/*glShader.setInt("texture1", 0);*/
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		//==========//
 
 		glGenVertexArrays(2, VAO);
 		glGenBuffers(2, VBO);
@@ -312,33 +374,52 @@ private:
 		glUseProgram(gl_shader_program);
 
 		float triangle1[] = {
-			-1.0f, -1.0f, 0.0f,  // bottom left
-			-1.0f, 0.0f, 0.0f,  // top left
-			1.0f, 0.0f, 0.0f,  // top right
+			-1.0f, -1.0f, 0.0f,		0.0f,0.0f,  // bottom left
+			-1.0f, 0.0f, 0.0f,		0.0f,1.0f,	// top left
+			1.0f, 0.0f, 0.0f,		1.0f,1.0f	// top right
 		};
 
 		float triangle2[] = {
-			-1.0f, -1.0f, 0.0f,  // bottom left
-			1.0f, 0.0f, 0.0f,  // top right
-			1.0f, -1.0f, 0.0f   // bottom right
+			-1.0f, -1.0f, 0.0f,		0.0f,0.0f,  // bottom left
+			1.0f, 0.0f, 0.0f,		1.0f,1.0f,	// top right
+			1.0f, -1.0f, 0.0f,		1.0f,0.0f	// bottom right
 		};
 
 		glBindVertexArray(VAO[0]);
 		glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle1), triangle1, GL_DYNAMIC_DRAW);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
 
 		glBindVertexArray(VAO[1]);
 		glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(triangle2), triangle2, GL_DYNAMIC_DRAW);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
 
-		//glTexImage2D();
-						
+		update_spectrogram_texture();
+		
+		int spectrogram_texture_pixel_count = spectrogram_num_frequencies * spectrogram_num_past_rows;
+
+		unsigned char* spectrogram_texture_pixels;
+		spectrogram_texture_pixels = (unsigned char*) malloc(spectrogram_texture_pixel_count * sizeof(unsigned char));
+
+		std::copy(spectrogram_texture_pixel_values.begin(), spectrogram_texture_pixel_values.end(), spectrogram_texture_pixels);
+		
+		glBindTexture(GL_TEXTURE_2D, gl_texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, spectrogram_num_frequencies, spectrogram_num_past_rows, 0, GL_RED, GL_UNSIGNED_BYTE, spectrogram_texture_pixels);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		free(spectrogram_texture_pixels);
+
 		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
+
+		glBindTexture(GL_TEXTURE_2D, gl_texture);
 						
 		glBindVertexArray(VAO[0]);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -463,14 +544,14 @@ private:
 		std::vector<float> rta_amplitudes = fft_output_averager.get_average();
 
 		nvgMoveTo(	ctx, 
-					rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freq[1]),
+					rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freqs[1]),
 					rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(rta_amplitudes[1])));
 
 		for (int x = 2; x < rta_amplitudes.size(); x++)
 		{
 						
 			nvgLineTo(ctx,
-				rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freq[x]),
+				rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freqs[x]),
 				rta_outline.getY() + rta_outline.getHeight() * rta_dBFS_to_y_proportion(fft_amp_to_dBFS(rta_amplitudes[x])));
 
 		}
@@ -580,7 +661,7 @@ private:
 
 	float fft_amp_to_dBFS(double amp) {
 
-		return Decibels::gainToDecibels(amp, -96.0);
+		return Decibels::gainToDecibels(amp, dBFS_lower_limit);
 
 	}
 
