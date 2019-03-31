@@ -16,11 +16,13 @@
 #include "fft.h"
 #include "moveavg.h"
 #include "gl_shader.h"
+#include "audio_performance.h"
 
 #include "spline.h"
 
 #include <chrono>
 #include <assert.h>
+#include <mutex>
 
 class MainComponent   : public AudioAppComponent, public Button::Listener, public Timer
 {
@@ -38,6 +40,7 @@ public:
 		startTimerHz(30);
 
 		addAndMakeVisible(audio_device_selector_component);
+		addAndMakeVisible(audio_performance_component);
 
 		fft_sample_buffer.resize(fft_size);
 		fft_bin_freqs.resize(fft_size / 2);
@@ -74,19 +77,22 @@ public:
 
 		const float* device_input_buffer = audio_device_buffer.buffer->getReadPointer(0);
 
-		fft0.fft_mtx.lock();
+		std::vector<float> latest_device_samples(audio_device_buffer.numSamples);
+
+		input_buffer_mtx.lock();
 
 		for (int sample = 0; sample < audio_device_buffer.numSamples; ++sample) {
 
-			fft0.input_time_samples.push_front(device_input_buffer[sample]);
+			input_sample_buffer.push_front(device_input_buffer[sample]);
+			latest_device_samples[sample] = device_input_buffer[sample];
 
 		}
 
-		while (fft0.input_time_samples.size() > fft_size) {
-			fft0.input_time_samples.pop_back();
+		while (input_sample_buffer.size() > fft_size) {
+			input_sample_buffer.pop_back();
 		}
 
-		fft0.fft_mtx.unlock();
+		input_buffer_mtx.unlock();
 
 		audio_device_buffer.clearActiveBufferRegion();
 
@@ -94,7 +100,14 @@ public:
 
 		std::chrono::duration<double> elapsed = end - start;
 
-		double audio_time = elapsed.count();
+		double audio_time = elapsed.count() * 1000;
+
+		callback_timer_mtx.lock();
+
+		audio_callback_times.push_back(audio_time);
+		while (audio_callback_times.size() > 100) { audio_callback_times.pop_back(); }
+
+		callback_timer_mtx.unlock();
 
 	}
 
@@ -115,12 +128,18 @@ public:
 		control_window_outline = getLocalBounds();
 		int control_window_height = control_window_outline.getHeight();
 
-		audio_device_selector_outline = control_window_outline.removeFromTop(control_window_height*0.20);
+		audio_device_selector_outline = control_window_outline.removeFromTop(225);
 		audio_device_selector_component.setBounds(audio_device_selector_outline);
+
+		audio_performance_outline = control_window_outline.removeFromTop(control_window_height * 0.10);
+		audio_performance_component.setBounds(audio_performance_outline);
 
     }
 
 private:
+
+	std::deque<float> input_sample_buffer;
+	std::mutex input_buffer_mtx, callback_timer_mtx;
 
 	const int fft_size = 16384;
 	const int sample_rate = 44100;
@@ -134,9 +153,14 @@ private:
 
 	std::vector<double> fft_sample_buffer;
 	MovingAverage fft_output_averager;
-	
+	AudioPeformanceEngine audio_performance_engine{1};
+	AudioPerformanceComponent audio_performance_component;
+	std::vector<float> audio_performance_buffer;
+	std::deque<float> audio_callback_times;
+		
 	juce::Rectangle<int> control_window_outline;
 	juce::Rectangle<int> audio_device_selector_outline;
+	juce::Rectangle<int> audio_performance_outline;
 
 	juce::Rectangle<int> display_window_outline;
 
@@ -181,6 +205,22 @@ private:
 	void timerCallback() override
 	{
 
+		input_buffer_mtx.lock();
+
+		std::copy(input_sample_buffer.begin(), input_sample_buffer.begin() + (fft0.local_fft_size), fft0.fft_input_samples);
+		
+		if (audio_performance_buffer.size() != input_sample_buffer.size()) {
+
+			audio_performance_buffer.resize(input_sample_buffer.size());
+
+		}
+
+		std::copy(input_sample_buffer.begin(), input_sample_buffer.end(), audio_performance_buffer.begin());
+
+		input_buffer_mtx.unlock();
+
+		run_performance_calcs();
+						
 		fft0.run_fft_analysis();
 
 		get_fft_amplitudes(fft0.fftw_complex_out, fft_bin_amps);
@@ -188,6 +228,20 @@ private:
 		update_averages();
 
 		render_display();
+
+	}
+
+	void run_performance_calcs() {
+
+		audio_performance_component.set_ape_analysis_results(audio_performance_engine.analyse_samples(audio_performance_buffer));
+
+		callback_timer_mtx.lock();
+
+		float sum_callback_times = std::accumulate(audio_callback_times.begin(), audio_callback_times.end(), 0.0);
+		audio_performance_component.set_indicated_callback_time(sum_callback_times / (audio_callback_times.size()*1.0));
+		audio_performance_component.repaint();
+
+		callback_timer_mtx.unlock();
 
 	}
 

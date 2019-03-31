@@ -8,7 +8,6 @@
 #include <array>
 #include <vector>
 #include <deque>
-#include <mutex>
 #include <assert.h>
 
 //Complex arrays use the following format: [Re][0], [Imag][1]
@@ -23,17 +22,11 @@ public:
 	const int local_fft_size;
 	int local_fft_bins;
 
-	std::mutex fft_mtx;
-
 	std::vector<double> hann_window_weights;
 
 	/*---------------------------------------------------*/
 
-	std::deque<double> input_time_samples;
-
-	/*---------------------------------------------------*/
-
-	double *fftw_samples_dynamic;
+	double *fft_input_samples;
 
 	fftw_complex *out;
 
@@ -52,8 +45,7 @@ public:
 		/*---------------------------------------------------*/ //set sizes of vectors
 
 		hann_window_weights.resize(local_fft_size);
-		input_time_samples.resize(local_fft_size);
-
+	
 		fftw_complex_out.resize(2, std::vector<double>(local_fft_bins)); //two rows, each row has as many columns as there are fft bins
 
 		/*---------------------------------------------------*/
@@ -62,10 +54,10 @@ public:
 
 		/*---------------------------------------------------*/
 
-		fftw_samples_dynamic = new double[local_fft_size];
+		fft_input_samples = new double[local_fft_size];
 
 		out = fftw_alloc_complex(local_fft_size);
-		plan = fftw_plan_dft_r2c_1d(local_fft_size, fftw_samples_dynamic, out, FFTW_MEASURE);
+		plan = fftw_plan_dft_r2c_1d(local_fft_size, fft_input_samples, out, FFTW_MEASURE);
 
 	};
 
@@ -73,7 +65,7 @@ public:
 
 		fftw_destroy_plan(plan);
 		fftw_free(out);
-		delete[]fftw_samples_dynamic;
+		delete[]fft_input_samples;
 
 	};
 
@@ -96,18 +88,9 @@ private:
 	}
 
 	void run_fftw(std::vector<std::vector<double>> & destinaton_vector) {
-
-		fft_mtx.lock();
 		
-		std::copy(input_time_samples.begin(), input_time_samples.begin() + local_fft_size, fftw_samples_dynamic);
-		
-		fft_mtx.unlock();
-
-		float first_sample = fftw_samples_dynamic[0];
-		float last_sample = fftw_samples_dynamic[4095];
-
 		for (int n = 0; n < local_fft_size; n++) {
-			fftw_samples_dynamic[n] = fftw_samples_dynamic[n] * hann_window_weights[n];
+			fft_input_samples[n] = fft_input_samples[n] * hann_window_weights[n];
 		}
 
 		fftw_execute(plan);

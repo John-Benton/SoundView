@@ -3,6 +3,8 @@
 <JUCERPROJECT id="HIMGLD" name="SoundView" projectType="guiapp" jucerVersion="5.4.3">
   <MAINGROUP id="P2sKT8" name="SoundView">
     <GROUP id="{9EDCC5A4-9B32-A1BE-89F6-38890F4B552C}" name="Source">
+      <FILE id="HUKIiX" name="audio_performance.h" compile="0" resource="0"
+            file="Source/audio_performance.h"/>
       <FILE id="nStE92" name="spline.h" compile="0" resource="0" file="Source/spline.h"/>
       <FILE id="boWeJ6" name="gl_shader.h" compile="0" resource="0" file="Source/gl_shader.h"/>
       <FILE id="D5RzBq" name="moveavg.h" compile="0" resource="0" file="Source/moveavg.h"/>
