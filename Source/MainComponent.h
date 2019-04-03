@@ -67,6 +67,13 @@ public:
 
     void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override
     {
+		if (active_sample_rate != sampleRate) {
+
+			active_sample_rate = sampleRate;
+
+			generate_fft_bin_freq(fft_bin_freqs, fft_size);
+
+		}
 
     }
 
@@ -142,7 +149,7 @@ private:
 	std::mutex input_buffer_mtx, callback_timer_mtx;
 
 	const int fft_size = 16384;
-	const int sample_rate = 44100;
+	int active_sample_rate = 44100;
 	fft fft0{ fft_size };
 	std::vector<float> fft_bin_freqs;
 	std::vector<float> fft_bin_amps;
@@ -157,7 +164,7 @@ private:
 	AudioPerformanceComponent audio_performance_component;
 	std::vector<float> audio_performance_buffer;
 	std::deque<float> audio_callback_times;
-		
+	
 	juce::Rectangle<int> control_window_outline;
 	juce::Rectangle<int> audio_device_selector_outline;
 	juce::Rectangle<int> audio_performance_outline;
@@ -256,7 +263,7 @@ private:
 
 		for (int x = 1; x < fft_size_N / 2; x++) {
 
-			freq_vect[x] = x * (sample_rate * 1.0 / fft_size_N * 1.0);
+			freq_vect[x] = x * (active_sample_rate * 1.0 / fft_size_N * 1.0);
 
 		}
 
