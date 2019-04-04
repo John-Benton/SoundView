@@ -24,7 +24,7 @@
 #include <assert.h>
 #include <mutex>
 
-class MainComponent   : public AudioAppComponent, public Button::Listener, public Timer
+class MainComponent   : public AudioAppComponent, public Button::Listener, public Timer, public Slider::Listener
 {
 public:
 
@@ -42,6 +42,11 @@ public:
 		addAndMakeVisible(audio_device_selector_component);
 		addAndMakeVisible(audio_performance_component);
 
+		addAndMakeVisible(num_rta_averages_slider);
+		num_rta_averages_slider.setRange(1.0, 100.0, 1.0);
+		num_rta_averages_slider.setValue(20.0, dontSendNotification);
+		num_rta_averages_slider.addListener(this);
+		
 		fft_sample_buffer.resize(fft_size);
 		fft_bin_freqs.resize(fft_size / 2);
 		fft_bin_amps.resize(fft_size / 2);
@@ -53,10 +58,9 @@ public:
 
 		generate_spectrogram_frequencies();
 
-		fft_output_averager.set_num_averages(10);
-
+		fft_output_averager.set_num_averages(num_rta_averages_slider.getValue());
 		fft_output_averager.set_num_samples(fft_bin_amps.size());
-
+		
     } 
 
     ~MainComponent()
@@ -128,7 +132,30 @@ public:
 
         g.fillAll (Colour(20,20,20));
 
+		g.setColour(Colours::white);
+
+		draw_divider(g, audio_device_selector_outline, 2, Colour(100, 100, 100));
+		draw_divider(g, audio_performance_outline, 2, Colour(100, 100, 100));
+
+		g.setFont(num_rta_averages_slider_label_outline.getHeight() * 0.75);
+		g.drawText("RTA Averages", num_rta_averages_slider_label_outline, Justification::centred, false);
+
     }
+
+	void draw_divider(Graphics& context, juce::Rectangle<int> rectangle_above_divider, int divider_height, Colour divider_color) {
+
+		context.saveState();
+
+		context.setColour(divider_color);
+
+		context.fillRect(rectangle_above_divider.getBottomLeft().getX(),
+			rectangle_above_divider.getBottomLeft().getY() - (divider_height/2),
+			rectangle_above_divider.getWidth(),
+			divider_height);
+
+		context.restoreState();
+
+	}
 
     void resized() override
     {
@@ -140,6 +167,9 @@ public:
 
 		audio_performance_outline = control_window_outline.removeFromTop(control_window_height * 0.10);
 		audio_performance_component.setBounds(audio_performance_outline);
+
+		num_rta_averages_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
+		num_rta_averages_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
 
     }
 
@@ -172,6 +202,10 @@ private:
 	juce::Rectangle<int> display_window_outline;
 
 	juce::Rectangle<int> rta_outline, frequency_label_outline, spectrogram_outline;
+
+	juce::Rectangle<int> num_rta_averages_slider_label_outline;
+	Slider num_rta_averages_slider;
+	int num_rta_averages_slider_value;
 
 	//====================//
 
@@ -250,6 +284,20 @@ private:
 
 		callback_timer_mtx.unlock();
 
+	}
+
+	void sliderValueChanged(Slider* slider) override
+		
+	{
+		if (slider = &num_rta_averages_slider) {
+
+			num_rta_averages_slider_value = num_rta_averages_slider.getValue();
+
+			fft_output_averager.set_num_averages(num_rta_averages_slider_value);
+
+		}
+		
+		
 	}
 
 	void buttonClicked(Button* button) override 
