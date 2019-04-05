@@ -6,13 +6,16 @@ in vec2 TexCoord;
 uniform sampler2D ourTexture;
 
 float saturation = 1.0;
-float lightness;
+float lightness = 0.5;
+float hue_proportion = 0.0;
 
 float highest_ampltidue_color_deg = 0.0;
 float lowest_amplitude_color_deg = 240.0;
 
-float lower_amplitude_limit = 0.01;
-float upper_amplitde_limit = 1.0;
+uniform float lower_amplitude_limit = -96.0;
+uniform float upper_amplitude_limit = 0.0;
+
+uniform float dBFS_lower_limit = -96.0;
 
 float R;
 float G;
@@ -27,25 +30,38 @@ void main()
 	   	
 	vec4 texture_value = texture(ourTexture, TexCoord);
 	
-	float texture_red_channel = texture_value.x;
+	float texture_red_channel_linear = texture_value.x;
+		
+	float texture_red_channel_dBFS;
+		
+	if(texture_red_channel_linear <= 0.0){
 	
-	float hue_proportion;
+	texture_red_channel_dBFS = dBFS_lower_limit;
 	
-	if(texture_red_channel < lower_amplitude_limit)
-	{
-		hue_proportion = 0.0;
-		lightness = 0.5 * (texture_red_channel / lower_amplitude_limit);
 	}
 	
-	if(texture_red_channel > upper_amplitde_limit)
+	if (texture_red_channel_linear > 0.0){
+	
+	texture_red_channel_dBFS = (20 * log(texture_red_channel_linear))-8.0;
+	
+	}
+			
+	if(texture_red_channel_dBFS > lower_amplitude_limit && texture_red_channel_dBFS < upper_amplitude_limit)
 	{
-		hue_proportion = 1.0;
+		hue_proportion = 1-abs((texture_red_channel_dBFS - upper_amplitude_limit)/(lower_amplitude_limit - upper_amplitude_limit));
+
 		lightness = 0.5;
 	}
 	
-	if(texture_red_channel > lower_amplitude_limit && texture_red_channel < upper_amplitde_limit)
+	if(texture_red_channel_dBFS <= lower_amplitude_limit)
 	{
-		hue_proportion = texture_red_channel;
+		hue_proportion = 0.0;
+		lightness = 0.0;
+	}
+	
+	if(texture_red_channel_dBFS >= upper_amplitude_limit)
+	{
+		hue_proportion = 1.0;
 		lightness = 0.5;
 	}
 
@@ -103,6 +119,6 @@ void main()
 	G = G1 + m;
 	B = B1 + m;
 	
-	FragColor = vec4(R,G,B,1.0);	
-	
+	FragColor = vec4(R,G,B,1.0);
+			
 }

@@ -46,6 +46,16 @@ public:
 		num_rta_averages_slider.setRange(1.0, 100.0, 1.0);
 		num_rta_averages_slider.setValue(20.0, dontSendNotification);
 		num_rta_averages_slider.addListener(this);
+
+		addAndMakeVisible(lower_threshold_amplitude_slider);
+		lower_threshold_amplitude_slider.setRange(-96.0, 0.0, 1.0);
+		lower_threshold_amplitude_slider.setValue(-96.0);
+		lower_threshold_amplitude_slider.addListener(this);
+
+		addAndMakeVisible(upper_threshold_amplitude_slider);
+		upper_threshold_amplitude_slider.setRange(-96.0, 0.0, 1.0);
+		upper_threshold_amplitude_slider.setValue(0.0);
+		upper_threshold_amplitude_slider.addListener(this);
 		
 		fft_sample_buffer.resize(fft_size);
 		fft_bin_freqs.resize(fft_size / 2);
@@ -140,6 +150,12 @@ public:
 		g.setFont(num_rta_averages_slider_label_outline.getHeight() * 0.75);
 		g.drawText("RTA Averages", num_rta_averages_slider_label_outline, Justification::centred, false);
 
+		g.setFont(lower_threshold_amplitude_slider_label_outline.getHeight() * 0.75);
+		g.drawText("Spectrogram Lower Threshold", lower_threshold_amplitude_slider_label_outline, Justification::centred, false);
+
+		g.setFont(upper_threshold_amplitude_slider_label_outline.getHeight() * 0.75);
+		g.drawText("Spectrogram Upper Threshold", upper_threshold_amplitude_slider_label_outline, Justification::centred, false);
+
     }
 
 	void draw_divider(Graphics& context, juce::Rectangle<int> rectangle_above_divider, int divider_height, Colour divider_color) {
@@ -171,6 +187,12 @@ public:
 		num_rta_averages_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
 		num_rta_averages_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
 
+		lower_threshold_amplitude_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
+		lower_threshold_amplitude_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
+
+		upper_threshold_amplitude_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
+		upper_threshold_amplitude_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
+
     }
 
 private:
@@ -185,6 +207,8 @@ private:
 	std::vector<float> fft_bin_amps;
 
 	double dBFS_lower_limit = -96.0;
+
+	int fft_amplitude_scaling_factor = 4.0;
 
 	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager, 1,1,0,0,0,0,0,0 };
 
@@ -206,6 +230,14 @@ private:
 	juce::Rectangle<int> num_rta_averages_slider_label_outline;
 	Slider num_rta_averages_slider;
 	int num_rta_averages_slider_value;
+
+	juce::Rectangle<int> lower_threshold_amplitude_slider_label_outline;
+	Slider lower_threshold_amplitude_slider;
+	int lower_threshold_amplitude_slider_value;
+
+	juce::Rectangle<int> upper_threshold_amplitude_slider_label_outline;
+	Slider upper_threshold_amplitude_slider;
+	int upper_threshold_amplitude_slider_value;
 
 	//====================//
 
@@ -289,15 +321,26 @@ private:
 	void sliderValueChanged(Slider* slider) override
 		
 	{
-		if (slider = &num_rta_averages_slider) {
+		if (slider == &num_rta_averages_slider) {
 
 			num_rta_averages_slider_value = num_rta_averages_slider.getValue();
 
 			fft_output_averager.set_num_averages(num_rta_averages_slider_value);
 
 		}
-		
-		
+
+		if (slider == &lower_threshold_amplitude_slider) {
+
+			lower_threshold_amplitude_slider_value = lower_threshold_amplitude_slider.getValue();
+
+		}
+
+		if (slider == &upper_threshold_amplitude_slider) {
+
+			upper_threshold_amplitude_slider_value = upper_threshold_amplitude_slider.getValue();
+
+		}
+				
 	}
 
 	void buttonClicked(Button* button) override 
@@ -348,7 +391,9 @@ private:
 
 		for (int x = 0; x < amplitude_vector.size(); x++) {
 
-			amplitude_vector[x] = sqrtf((pow(fft_output_complex[0][x],2)) + (pow(fft_output_complex[1][x], 2)));
+			amplitude_vector[x] =	(sqrtf((pow(fft_output_complex[0][x],2)) + (pow(fft_output_complex[1][x], 2)))) 
+				
+									* fft_amplitude_scaling_factor;
 
 		}
 
@@ -525,6 +570,10 @@ private:
 
 		free(spectrogram_texture_pixels);
 
+		Shader::setOutsideFloat(gl_shader_program, "lower_amplitude_limit", lower_threshold_amplitude_slider_value);
+		Shader::setOutsideFloat(gl_shader_program, "upper_amplitude_limit", upper_threshold_amplitude_slider_value);
+		Shader::setOutsideFloat(gl_shader_program, "dBFS_lower_limit", dBFS_lower_limit);
+		
 		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
@@ -537,7 +586,7 @@ private:
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		nvg_render(nvg_context);
-		
+					
 		glfwSwapBuffers(display_window);
 
 	}
