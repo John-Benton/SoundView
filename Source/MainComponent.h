@@ -70,6 +70,8 @@ public:
 
 		fft_output_averager.set_num_averages(num_rta_averages_slider.getValue());
 		fft_output_averager.set_num_samples(fft_bin_amps.size());
+
+		input_sample_buffer.resize(fft_size);
 		
     } 
 
