@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="HIMGLD" name="SoundView" projectType="guiapp" jucerVersion="5.4.3">
+<JUCERPROJECT id="HIMGLD" name="SoundView" projectType="guiapp" jucerVersion="5.4.1">
   <MAINGROUP id="P2sKT8" name="SoundView">
     <GROUP id="{9EDCC5A4-9B32-A1BE-89F6-38890F4B552C}" name="Source">
       <FILE id="HUKIiX" name="audio_performance.h" compile="0" resource="0"
