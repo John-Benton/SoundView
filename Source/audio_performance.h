@@ -5,7 +5,7 @@
 
 #include <deque>
 
-struct AudioPeformanceTextIndicator
+struct AudioPerformanceTextIndicator
 {
 
 	juce::Rectangle<int> indicator_outline;
@@ -53,6 +53,7 @@ public:
 		indicator_2.indicator_label_text = "Clipped Samples";
 		indicator_3.indicator_label_text = "Invalid Samples";
 		indicator_4.indicator_label_text = "Audio Callback Time (ms)";
+		indicator_5.indicator_label_text = "Total Audio Over/Underruns";
 	
 	};
 	
@@ -75,6 +76,9 @@ public:
 		indicator_4.indicator_value = String(indicated_audio_callback_time);
 		indicator_4.draw_indicator(g);
 
+		indicator_5.indicator_value = String(indicated_xruns);
+		indicator_5.draw_indicator(g);
+
 	}
 
 	void resized() override
@@ -83,10 +87,11 @@ public:
 		component_outline = getLocalBounds();
 		int component_height = component_outline.getHeight();
 		
-		indicator_1.set_indicator_outline(component_outline.removeFromTop(component_height*0.25));
-		indicator_2.set_indicator_outline(component_outline.removeFromTop(component_height*0.25));
-		indicator_3.set_indicator_outline(component_outline.removeFromTop(component_height*0.25));
-		indicator_4.set_indicator_outline(component_outline);
+		indicator_1.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
+		indicator_2.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
+		indicator_3.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
+		indicator_4.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
+		indicator_5.set_indicator_outline(component_outline);
 
 	}
 
@@ -103,17 +108,25 @@ public:
 		indicated_audio_callback_time = callback_time;
 
 	}
-	
+
+	void set_indicated_xruns(int xruns) {
+
+		indicated_xruns = xruns;
+
+	}
+		
 private:
 
 	std::vector<int> ape_analysis_results{0,0,0};
-	float indicated_audio_callback_time;
+	float indicated_audio_callback_time{ 0.0 };
+	int indicated_xruns{ 0 };
 
 	juce::Rectangle<int> component_outline;
-	AudioPeformanceTextIndicator indicator_1;
-	AudioPeformanceTextIndicator indicator_2;
-	AudioPeformanceTextIndicator indicator_3;
-	AudioPeformanceTextIndicator indicator_4;
+	AudioPerformanceTextIndicator indicator_1;
+	AudioPerformanceTextIndicator indicator_2;
+	AudioPerformanceTextIndicator indicator_3;
+	AudioPerformanceTextIndicator indicator_4;
+	AudioPerformanceTextIndicator indicator_5;
 
 };
 

@@ -32,13 +32,11 @@ public:
     {
 		juce::Rectangle<int> screen = Desktop::getInstance().getDisplays().getMainDisplay().userArea; //Thank you Matthias Gehrmann
 	    setSize (screen.getWidth()*0.20, screen.getWidth()*0.5);
-
-        setAudioChannels (2, 2);
-
+		
 		setup_GL(screen.getWidth());
 
 		startTimerHz(30);
-
+		
 		addAndMakeVisible(audio_device_selector_component);
 		addAndMakeVisible(audio_performance_component);
 
@@ -50,11 +48,13 @@ public:
 		addAndMakeVisible(lower_threshold_amplitude_slider);
 		lower_threshold_amplitude_slider.setRange(-96.0, 0.0, 1.0);
 		lower_threshold_amplitude_slider.setValue(-96.0);
+		lower_threshold_amplitude_slider_value = lower_threshold_amplitude_slider.getValue();
 		lower_threshold_amplitude_slider.addListener(this);
 
 		addAndMakeVisible(upper_threshold_amplitude_slider);
 		upper_threshold_amplitude_slider.setRange(-96.0, 0.0, 1.0);
 		upper_threshold_amplitude_slider.setValue(0.0);
+		upper_threshold_amplitude_slider_value = upper_threshold_amplitude_slider.getValue();
 		upper_threshold_amplitude_slider.addListener(this);
 		
 		fft_sample_buffer.resize(fft_size);
@@ -72,9 +72,11 @@ public:
 		fft_output_averager.set_num_samples(fft_bin_amps.size());
 
 		input_sample_buffer.resize(fft_size);
-		
-    } 
 
+		setAudioChannels(2, 0);
+				
+    } 
+	
     ~MainComponent()
     {
         shutdownAudio();
@@ -83,6 +85,7 @@ public:
 
     void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override
     {
+
 		if (active_sample_rate != sampleRate) {
 
 			active_sample_rate = sampleRate;
@@ -96,6 +99,10 @@ public:
 	void getNextAudioBlock(const AudioSourceChannelInfo& audio_device_buffer)
 	{
 	
+		//auto device_setup = this->deviceManager.getAudioDeviceSetup();
+
+		//auto output_channels = device_setup.outputChannels;
+		
 		auto start = std::chrono::high_resolution_clock::now(); //Thanks to Giovanni Dicanio for timing method
 
 		const float* device_input_buffer = audio_device_buffer.buffer->getReadPointer(0);
@@ -128,9 +135,12 @@ public:
 		callback_timer_mtx.lock();
 
 		audio_callback_times.push_back(audio_time);
+		
 		while (audio_callback_times.size() > 100) { audio_callback_times.pop_back(); }
 
 		callback_timer_mtx.unlock();
+
+		reported_xruns = this->deviceManager.getXRunCount();
 
 	}
 
@@ -212,7 +222,7 @@ private:
 
 	int fft_amplitude_scaling_factor = 4.0;
 
-	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager, 1,1,0,0,0,0,0,0 };
+	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager,1,1,0,0,0,0,0,0 };
 
 	std::vector<double> fft_sample_buffer;
 	MovingAverage fft_output_averager;
@@ -220,6 +230,7 @@ private:
 	AudioPerformanceComponent audio_performance_component;
 	std::vector<float> audio_performance_buffer;
 	std::deque<float> audio_callback_times;
+	int reported_xruns{ 0 }; //reported over/underruns of audio device buffer
 	
 	juce::Rectangle<int> control_window_outline;
 	juce::Rectangle<int> audio_device_selector_outline;
@@ -311,13 +322,13 @@ private:
 		audio_performance_component.set_ape_analysis_results(audio_performance_engine.analyse_samples(audio_performance_buffer));
 
 		callback_timer_mtx.lock();
-
 		float sum_callback_times = std::accumulate(audio_callback_times.begin(), audio_callback_times.end(), 0.0);
-		audio_performance_component.set_indicated_callback_time(sum_callback_times / (audio_callback_times.size()*1.0));
-		audio_performance_component.repaint();
-
 		callback_timer_mtx.unlock();
-
+		
+		audio_performance_component.set_indicated_callback_time(sum_callback_times / (audio_callback_times.size()*1.0));
+		audio_performance_component.set_indicated_xruns(reported_xruns);
+		audio_performance_component.repaint();
+			
 	}
 
 	void sliderValueChanged(Slider* slider) override
