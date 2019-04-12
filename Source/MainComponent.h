@@ -56,6 +56,12 @@ public:
 		upper_threshold_amplitude_slider.setValue(0.0);
 		upper_threshold_amplitude_slider_value = upper_threshold_amplitude_slider.getValue();
 		upper_threshold_amplitude_slider.addListener(this);
+
+		addAndMakeVisible(spectrogram_histories_slider);
+		spectrogram_histories_slider.setRange(100.0, 1000.0, 10.0);
+		spectrogram_histories_slider.setValue(250);
+		spectrogram_histories_slider_value = spectrogram_histories_slider.getValue();
+		spectrogram_histories_slider.addListener(this);
 		
 		fft_sample_buffer.resize(fft_size);
 		fft_bin_freqs.resize(fft_size / 2);
@@ -168,6 +174,9 @@ public:
 		g.setFont(upper_threshold_amplitude_slider_label_outline.getHeight() * 0.75);
 		g.drawText("Spectrogram Upper Threshold", upper_threshold_amplitude_slider_label_outline, Justification::centred, false);
 
+		g.setFont(spectrogram_histories_slider_label_outline.getHeight() * 0.75);
+		g.drawText("Spectrogram Histories", spectrogram_histories_slider_label_outline, Justification::centred, false);
+
     }
 
 	void draw_divider(Graphics& context, juce::Rectangle<int> rectangle_above_divider, int divider_height, Colour divider_color) {
@@ -193,8 +202,10 @@ public:
 		audio_device_selector_outline = control_window_outline.removeFromTop(225);
 		audio_device_selector_component.setBounds(audio_device_selector_outline);
 
-		audio_performance_outline = control_window_outline.removeFromTop(control_window_height * 0.10);
+		audio_performance_outline = control_window_outline.removeFromTop(control_window_height * 0.15);
 		audio_performance_component.setBounds(audio_performance_outline);
+
+		control_window_outline.removeFromTop(control_window_height * 0.01);
 
 		num_rta_averages_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
 		num_rta_averages_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
@@ -204,6 +215,9 @@ public:
 
 		upper_threshold_amplitude_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
 		upper_threshold_amplitude_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
+
+		spectrogram_histories_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
+		spectrogram_histories_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
 
     }
 
@@ -251,6 +265,10 @@ private:
 	juce::Rectangle<int> upper_threshold_amplitude_slider_label_outline;
 	Slider upper_threshold_amplitude_slider;
 	int upper_threshold_amplitude_slider_value;
+
+	juce::Rectangle<int> spectrogram_histories_slider_label_outline;
+	Slider spectrogram_histories_slider;
+	int spectrogram_histories_slider_value;
 
 	//====================//
 
@@ -351,6 +369,12 @@ private:
 		if (slider == &upper_threshold_amplitude_slider) {
 
 			upper_threshold_amplitude_slider_value = upper_threshold_amplitude_slider.getValue();
+
+		}
+
+		if (slider == &spectrogram_histories_slider) {
+
+			spectrogram_num_past_rows = spectrogram_histories_slider.getValue();
 
 		}
 				

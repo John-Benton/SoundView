@@ -86,12 +86,16 @@ public:
 
 		component_outline = getLocalBounds();
 		int component_height = component_outline.getHeight();
+
+		component_outline.removeFromTop(component_height*0.05);
 		
-		indicator_1.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
-		indicator_2.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
-		indicator_3.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
-		indicator_4.set_indicator_outline(component_outline.removeFromTop(component_height*0.20));
-		indicator_5.set_indicator_outline(component_outline);
+		indicator_1.set_indicator_outline(component_outline.removeFromTop(component_height*0.18));
+		indicator_2.set_indicator_outline(component_outline.removeFromTop(component_height*0.18));
+		indicator_3.set_indicator_outline(component_outline.removeFromTop(component_height*0.18));
+		indicator_4.set_indicator_outline(component_outline.removeFromTop(component_height*0.18));
+		indicator_5.set_indicator_outline(component_outline.removeFromTop(component_height*0.18));
+
+		component_outline.removeFromTop(component_height*0.05);
 
 	}
 
