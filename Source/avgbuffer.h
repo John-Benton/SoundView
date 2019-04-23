@@ -4,13 +4,13 @@
 #include <deque>
 #include <numeric>
 
-class MovingAverage
+class AveragingBuffer
 {
 public:
 
-	MovingAverage() {};
+	AveragingBuffer() {};
 
-	~MovingAverage() {};
+	~AveragingBuffer() {};
 
 	void set_num_averages(int num_averages) {
 

@@ -14,9 +14,10 @@
 #include <deque>
 
 #include "fft.h"
-#include "moveavg.h"
+#include "avgbuffer.h"
 #include "gl_shader.h"
 #include "audio_performance.h"
+#include "moving_avg.h"
 
 #include "spline.h"
 
@@ -62,6 +63,18 @@ public:
 		spectrogram_histories_slider.setValue(250);
 		spectrogram_histories_slider_value = spectrogram_histories_slider.getValue();
 		spectrogram_histories_slider.addListener(this);
+
+		addAndMakeVisible(smoothing_window_type_slider);
+		smoothing_window_type_slider.setRange(0, 2, 1);
+		smoothing_window_type_slider.setValue(2);
+		smoothing_window_type_slider_value = smoothing_window_type_slider.getValue();
+		smoothing_window_type_slider.addListener(this);
+
+		addAndMakeVisible(smoothing_window_size_slider);
+		smoothing_window_size_slider.setRange(1, 99, 2);
+		smoothing_window_size_slider.setValue(15);
+		smoothing_window_size_slider_value = smoothing_window_size_slider.getValue();
+		smoothing_window_size_slider.addListener(this);
 		
 		fft_sample_buffer.resize(fft_size);
 		fft_bin_freqs.resize(fft_size / 2);
@@ -177,6 +190,12 @@ public:
 		g.setFont(spectrogram_histories_slider_label_outline.getHeight() * 0.75);
 		g.drawText("Spectrogram Histories", spectrogram_histories_slider_label_outline, Justification::centred, false);
 
+		g.setFont(smoothing_window_type_slider_label_outline.getHeight() * 0.75);
+		g.drawText("RTA Smoothing Window Type", smoothing_window_type_slider_label_outline, Justification::centred, false);
+
+		g.setFont(smoothing_window_size_slider_label_outline.getHeight() * 0.75);
+		g.drawText("RTA Smoothing Window Size", smoothing_window_size_slider_label_outline, Justification::centred, false);
+
     }
 
 	void draw_divider(Graphics& context, juce::Rectangle<int> rectangle_above_divider, int divider_height, Colour divider_color) {
@@ -219,6 +238,12 @@ public:
 		spectrogram_histories_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
 		spectrogram_histories_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
 
+		smoothing_window_type_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
+		smoothing_window_type_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
+
+		smoothing_window_size_slider_label_outline = control_window_outline.removeFromTop(control_window_height * 0.025);
+		smoothing_window_size_slider.setBounds(control_window_outline.removeFromTop(control_window_height * 0.025));
+		
     }
 
 private:
@@ -239,7 +264,9 @@ private:
 	AudioDeviceSelectorComponent audio_device_selector_component{ this->deviceManager,1,1,0,0,0,0,0,0 };
 
 	std::vector<double> fft_sample_buffer;
-	MovingAverage fft_output_averager;
+	AveragingBuffer fft_output_averager;
+	MovingAverageSmoother sample_smoother;
+
 	AudioPeformanceEngine audio_performance_engine{1};
 	AudioPerformanceComponent audio_performance_component;
 	std::vector<float> audio_performance_buffer;
@@ -269,6 +296,14 @@ private:
 	juce::Rectangle<int> spectrogram_histories_slider_label_outline;
 	Slider spectrogram_histories_slider;
 	int spectrogram_histories_slider_value;
+
+	juce::Rectangle<int> smoothing_window_type_slider_label_outline;
+	Slider smoothing_window_type_slider;
+	int smoothing_window_type_slider_value;
+
+	juce::Rectangle<int> smoothing_window_size_slider_label_outline;
+	Slider smoothing_window_size_slider;
+	int smoothing_window_size_slider_value;
 
 	//====================//
 
@@ -375,6 +410,18 @@ private:
 		if (slider == &spectrogram_histories_slider) {
 
 			spectrogram_num_past_rows = spectrogram_histories_slider.getValue();
+
+		}
+
+		if (slider == &smoothing_window_type_slider) {
+
+			smoothing_window_type_slider_value = smoothing_window_type_slider.getValue();
+
+		}
+
+		if (slider == &smoothing_window_size_slider) {
+
+			smoothing_window_size_slider_value = smoothing_window_size_slider.getValue();
 
 		}
 				
@@ -736,7 +783,10 @@ private:
 
 		nvgBeginPath(ctx);
 
-		std::vector<float> rta_amplitudes = fft_output_averager.get_average();
+		std::vector<float> rta_amplitudes = 
+			sample_smoother.process_samples(	fft_output_averager.get_average(), 
+												smoothing_window_type_slider_value, 
+												smoothing_window_size_slider_value);
 
 		nvgMoveTo(	ctx, 
 					rta_outline.getX() + rta_outline.getWidth() * frequency_to_x_proportion(fft_bin_freqs[1]),
