@@ -4,7 +4,7 @@
 
 #include <GLFW/glfw3.h>
 
-#define NANOVG_GL3_IMPLEMENTATION
+#define NANOVG_GL2_IMPLEMENTATION
 
 #include <nanovg.h>
 #include <nanovg_gl.h>
@@ -543,9 +543,9 @@ private:
 
 		glfwInit();
 
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+		//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+		//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_ANY_PROFILE);
 
 		display_window = glfwCreateWindow(screen_width*0.5, screen_width*0.5, "SoundView Display", NULL, NULL);
 
@@ -590,7 +590,7 @@ private:
 		
 		//==//
 
-		nvg_context = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+		nvg_context = nvgCreateGL2(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
 
 		nvgCreateFont(nvg_context, "Arial", "C://Windows//Fonts//arial.ttf");
 		
